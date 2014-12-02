@@ -18,10 +18,12 @@ compart_nx = 10
 h = 1.0/compart_nx
 D = 1.0/400.0
 N = 1000
+interface = 0.5
 
 compartmentsA = tyche.new_species(D)
-compartments = tyche.new_compartments([1-h,0,0],[2.0,h,h],[h,h,h])
+compartments = tyche.new_compartments([0,0,0],[1.0,h,h],[h,h,h])
 compartments.add_diffusion(compartmentsA);
+compartments.set_diffusion_across(tyche.new_xplane(interface-h),0,0)
 
 # Create mesh and define function space
 mesh = UnitInterval(pde_nx)
@@ -35,7 +37,7 @@ u0 = Expression('N/(sigma*sqrt(2*3.14))*exp(-pow(x[0]-mu,2)/(2*pow(sigma,2)))',
 # Define C_-1
 class C_neg1(SubDomain):
     def inside(self, x, on_boundary):
-        return between(x[0], (1-h, 1))
+        return between(x[0], (interface-h, interface))
         
 # Initialize cell and vertex mesh functions for C_-1
 domains_cell = CellFunction("size_t", mesh)
@@ -51,6 +53,10 @@ c_neg1_vertex_index = pde_nx-c_neg1_vertex_index
 # Define new measures
 dx = Measure("dx")[domains_cell]
 
+# Boundary condition for interface
+def interface_bdry(x, on_boundary):
+    return near(x[0],interface)
+bc = NewmannBC(V, Constant(0), bdry)
 
 # Initial condition
 u_1 = interpolate(u0, V)
@@ -120,7 +126,7 @@ while t <= T:
     #b = M*u_1.vector() + pde_dt*M*F_k
     b = M*u_1.vector()
     u0.t = t
-    #bc.apply(A, b)
+    bc.apply(A, b)
     solve(A, u.vector(), b)
 
     t += pde_dt
