@@ -28,7 +28,7 @@ tmp = tyche.new_xplane(interface-h,1)
 compartments.scale_diffusion_across2(tmp,0.0)
 
 # Create mesh and define function space
-mesh = UnitInterval(pde_nx)
+mesh = UnitIntervalMesh(pde_nx)
 V = FunctionSpace(mesh, 'Lagrange', 1)
 
 # Define boundary and initial conditions
@@ -44,18 +44,18 @@ class C_neg1(SubDomain):
 # Define compartment domain
 class Compartment_domain(SubDomain):
     def inside(self, x, on_boundary):
-        return x[0] > interface
+        return between(x[0], (interface, 1.0))
         
 # Initialize cell and vertex mesh functions for C_-1
-domains_cell = CellFunction("int", mesh)
-domains_vertex = VertexFunction("int", mesh)
+domains_cell = CellFunction("size_t", mesh)
+domains_vertex = VertexFunction("size_t", mesh)
 domains_cell.set_all(0)
 domains_vertex.set_all(0)
 c_neg1 = C_neg1()
 c_neg1.mark(domains_cell, 1)
 c_neg1.mark(domains_vertex, 1)
 c_neg1_vertex_index = np.where(domains_vertex.array()==1)[0]
-c_neg1_vertex_index = pde_nx-c_neg1_vertex_index
+#c_neg1_vertex_index = pde_nx-c_neg1_vertex_index
 compartment_domain = Compartment_domain()
 compartment_domain.mark(domains_cell, 2)
 
@@ -95,13 +95,14 @@ compartments_array = compartmentsA.get_compartments()
 
 # setup plotting
 plt.figure()
-x_pde = np.arange(1,0-1.0/pde_nx,-1.0/pde_nx)
-x_compart = np.arange(1-h,2,h)
+x_pde = np.arange(0,1+1.0/pde_nx,1.0/pde_nx)
+#x_pde = np.arange(1,0-1.0/pde_nx,-1.0/pde_nx)
+x_compart = np.arange(0,1,h)
 print x_pde.shape,u_1.vector().array().shape
 plot_pde, = plt.plot(x_pde,u_1.vector().array(),label='PDE')
 plot_compart = plt.bar(x_compart,compartments_array[:,0,0]/h,width=h)
-plt.xlim([0,2])
-plt.ylim([0,1000])
+plt.xlim([0,1])
+plt.ylim([0,2000])
 
 # time loop
 while t <= T:
@@ -118,7 +119,6 @@ while t <= T:
     # update pde in C_-1
     compartments_array = compartmentsA.get_compartments()
     dC_neg1 = compartments_array[c_neg1_compartment_index,0,0]-int(c_neg1_val)
-    print 'adding ',dC_neg1,' particles to pde C_-1'
     u_1.vector()[c_neg1_vertex_index] += dC_neg1/h
     
     plot_pde.set_ydata(u_1.vector().array())
