@@ -11,12 +11,12 @@ import pyTyche as tyche
 import matplotlib.pyplot as plt
 import numpy as np
 
-T = 1000.0       # total simulation time
-pde_dt = 3      # time step
+T = 1.0       # total simulation time
+pde_dt = 1/10.0      # time step
 pde_nx = 50
 compart_nx = 10
 h = 1.0/compart_nx
-D = 1.0/400.0
+D = 1.0
 N = 1000
 interface = 0.5
 c_neg1_compartment_index = int(compart_nx/2)-1
@@ -69,24 +69,33 @@ dx = Measure("dx")[domains_cell]
 
 # Initial condition
 u_1 = interpolate(u0, V)
+u_2 = interpolate(u0, V)
 
 # Laplace term
 u = TrialFunction(V)
+u2 = TrialFunction(V)
 v = TestFunction(V)
 a_K = D*inner(nabla_grad(u), nabla_grad(v))*(dx(0)+dx(1))
+a_K2 = D*inner(nabla_grad(u2), nabla_grad(v))*(dx(0)+dx(1)+dx(2))
 
 # "Mass matrix" term
 a_M = u*v*(dx(0)+dx(1))
+a_M2 = u*v*(dx(0)+dx(1)+dx(2))
 
 M = assemble(a_M)
 K = assemble(a_K)
 A = M + pde_dt*K
+
+M2 = assemble(a_M2)
+K2 = assemble(a_K2)
+A2 = M2 + pde_dt*K2
 
 # source term
 #f = Expression('beta - 2 - 2*alpha', beta=beta, alpha=alpha)
 
 # Compute solution
 u = Function(V)
+u2 = Function(V)
 t = pde_dt
 
 # integral over C_-1 pseudocompartment
@@ -99,10 +108,12 @@ x_pde = np.arange(0,1+1.0/pde_nx,1.0/pde_nx)
 #x_pde = np.arange(1,0-1.0/pde_nx,-1.0/pde_nx)
 x_compart = np.arange(0,1,h)
 print x_pde.shape,u_1.vector().array().shape
-plot_pde, = plt.plot(x_pde,u_1.vector().array(),label='PDE')
+plot_pde, = plt.plot(x_pde,u_1.vector().array(),linewidth=2,label='PDE')
+plot_pde2, = plt.plot(x_pde,u_2.vector().array(),linestyle='--',linewidth=2,label='PDE_c')
 plot_compart = plt.bar(x_compart,compartments_array[:,0,0]/h,width=h)
 plt.xlim([0,1])
-plt.ylim([0,2000])
+plt.ylim([0,3000])
+plt.legend()
 
 # time loop
 while t <= T:
@@ -122,9 +133,10 @@ while t <= T:
     u_1.vector()[c_neg1_vertex_index] += dC_neg1/h
     
     plot_pde.set_ydata(u_1.vector().array())
+    plot_pde2.set_ydata(u_2.vector().array())
     for rect, height in zip(plot_compart, compartments_array):
         rect.set_height(height/h)
-    plt.pause(0.0001)
+    plt.pause(1.1)
 
     
     # f.t = t
@@ -132,10 +144,13 @@ while t <= T:
     #F_k = f_k.vector()
     #b = M*u_1.vector() + pde_dt*M*F_k
     b = M*u_1.vector()
+    b2 = M2*u_2.vector()
     u0.t = t
     #bc.apply(A, b)
     solve(A, u.vector(), b)
+    solve(A2, u2.vector(), b2)
 
     t += pde_dt
     u_1.assign(u)
+    u_2.assign(u2)
  
