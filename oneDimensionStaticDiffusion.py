@@ -24,7 +24,8 @@ c_neg1_compartment_index = int(compart_nx/2)-1
 compartmentsA = tyche.new_species(D)
 compartments = tyche.new_compartments([0,0,0],[1.0,h,h],[h,h,h])
 compartments.add_diffusion(compartmentsA);
-compartments.scale_diffusion_across(tyche.new_xplane(interface-h),0)
+tmp = tyche.new_xplane(interface-h,1)
+compartments.scale_diffusion_across2(tmp,0.0)
 
 # Create mesh and define function space
 mesh = UnitInterval(pde_nx)
@@ -40,9 +41,14 @@ class C_neg1(SubDomain):
     def inside(self, x, on_boundary):
         return between(x[0], (interface-h, interface))
         
+# Define compartment domain
+class Compartment_domain(SubDomain):
+    def inside(self, x, on_boundary):
+        return x[0] > interface
+        
 # Initialize cell and vertex mesh functions for C_-1
-domains_cell = CellFunction("size_t", mesh)
-domains_vertex = VertexFunction("size_t", mesh)
+domains_cell = CellFunction("int", mesh)
+domains_vertex = VertexFunction("int", mesh)
 domains_cell.set_all(0)
 domains_vertex.set_all(0)
 c_neg1 = C_neg1()
@@ -50,14 +56,16 @@ c_neg1.mark(domains_cell, 1)
 c_neg1.mark(domains_vertex, 1)
 c_neg1_vertex_index = np.where(domains_vertex.array()==1)[0]
 c_neg1_vertex_index = pde_nx-c_neg1_vertex_index
+compartment_domain = Compartment_domain()
+compartment_domain.mark(domains_cell, 2)
 
 # Define new measures
 dx = Measure("dx")[domains_cell]
 
 # Boundary condition for interface
-def interface_bdry(x, on_boundary):
-    return near(x[0],interface)
-bc = NewmannBC(V, Constant(0), bdry)
+#def interface_bdry(x, on_boundary):
+#    return near(x[0],interface)
+#bc = NewmannBC(V, Constant(0), bdry)
 
 # Initial condition
 u_1 = interpolate(u0, V)
@@ -125,7 +133,7 @@ while t <= T:
     #b = M*u_1.vector() + pde_dt*M*F_k
     b = M*u_1.vector()
     u0.t = t
-    bc.apply(A, b)
+    #bc.apply(A, b)
     solve(A, u.vector(), b)
 
     t += pde_dt
