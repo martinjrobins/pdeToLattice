@@ -19,17 +19,18 @@ h = 1.0/compart_nx
 D = 1.0/400.0
 N = 1000
 interface = 0.5
+c_neg1_compartment_index = int(compart_nx/2)-1
 
 compartmentsA = tyche.new_species(D)
 compartments = tyche.new_compartments([0,0,0],[1.0,h,h],[h,h,h])
 compartments.add_diffusion(compartmentsA);
-compartments.set_diffusion_across(tyche.new_xplane(interface-h),0,0)
+compartments.scale_diffusion_across(tyche.new_xplane(interface-h),0)
 
 # Create mesh and define function space
 mesh = UnitInterval(pde_nx)
 V = FunctionSpace(mesh, 'Lagrange', 1)
 
-# Define boundary conditions
+# Define boundary and initial conditions
 mu = 0.25; sigma = 0.1
 u0 = Expression('N/(sigma*sqrt(2*3.14))*exp(-pow(x[0]-mu,2)/(2*pow(sigma,2)))',
                 mu=mu, sigma=sigma,N=N)
@@ -61,8 +62,6 @@ bc = NewmannBC(V, Constant(0), bdry)
 # Initial condition
 u_1 = interpolate(u0, V)
 
-# Define variational problem
-
 # Laplace term
 u = TrialFunction(V)
 v = TestFunction(V)
@@ -75,7 +74,7 @@ M = assemble(a_M)
 K = assemble(a_K)
 A = M + pde_dt*K
 
-# f term
+# source term
 #f = Expression('beta - 2 - 2*alpha', beta=beta, alpha=alpha)
 
 # Compute solution
@@ -85,9 +84,8 @@ t = pde_dt
 # integral over C_-1 pseudocompartment
 c_neg1_integral = u_1*dx(1)
 compartments_array = compartmentsA.get_compartments()
-print compartments_array.shape
 
-#compartments.fill_uniform([1-h,0,0],[1,tmp,tmp],int(v2))
+# setup plotting
 plt.figure()
 x_pde = np.arange(1,0-1.0/pde_nx,-1.0/pde_nx)
 x_compart = np.arange(1-h,2,h)
@@ -96,28 +94,29 @@ plot_pde, = plt.plot(x_pde,u_1.vector().array(),label='PDE')
 plot_compart = plt.bar(x_compart,compartments_array[:,0,0]/h,width=h)
 plt.xlim([0,2])
 plt.ylim([0,1000])
+
+# time loop
 while t <= T:
     print 'time =', t
     
     # Update C_-1 compartment
     c_neg1_val = assemble(c_neg1_integral)
-    print 'setting ',c_neg1_val,' particles to C_-1'
-    compartments_array[0,0,0] = int(c_neg1_val)
-    compartmentsA.set_compartments(compartments_array)
-    compartments.reset_all_propensities()   
-    plot_pde.set_ydata(u_1.vector().array())
-    for rect, height in zip(plot_compart, compartments_array):
-        rect.set_height(height/h)
-    plt.pause(0.0001)
+    compartments.set_compartment(compartmentsA,[interface-h/2,0,0],int(c_neg1_val))
+
     
     # Integrate lattice to t+pde_dt
     compartments.integrate_for_time(pde_dt,pde_dt)
     
     # update pde in C_-1
     compartments_array = compartmentsA.get_compartments()
-    dC_neg1 = compartments_array[0,0,0]-int(c_neg1_val)
+    dC_neg1 = compartments_array[c_neg1_compartment_index,0,0]-int(c_neg1_val)
     print 'adding ',dC_neg1,' particles to pde C_-1'
     u_1.vector()[c_neg1_vertex_index] += dC_neg1/h
+    
+    plot_pde.set_ydata(u_1.vector().array())
+    for rect, height in zip(plot_compart, compartments_array):
+        rect.set_height(height/h)
+    plt.pause(0.0001)
 
     
     # f.t = t
