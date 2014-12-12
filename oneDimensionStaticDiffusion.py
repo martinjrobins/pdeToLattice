@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 T = 1.0       # total simulation time
-pde_dt = 1/10.0      # time step
-pde_nx = 50
-compart_nx = 10
+pde_dt = 1/100.0      # time step
+pde_nx = 60
+compart_nx = 20
 h = 1.0/compart_nx
 D = 1.0
 N = 1000
@@ -32,7 +32,7 @@ mesh = UnitIntervalMesh(pde_nx)
 V = FunctionSpace(mesh, 'Lagrange', 1)
 
 # Define boundary and initial conditions
-mu = 0.25; sigma = 0.1
+mu = 0.5; sigma = 0.1
 u0 = Expression('N/(sigma*sqrt(2*3.14))*exp(-pow(x[0]-mu,2)/(2*pow(sigma,2)))',
                 mu=mu, sigma=sigma,N=N)
                 
@@ -58,6 +58,9 @@ c_neg1_vertex_index = np.where(domains_vertex.array()==1)[0]
 #c_neg1_vertex_index = pde_nx-c_neg1_vertex_index
 compartment_domain = Compartment_domain()
 compartment_domain.mark(domains_cell, 2)
+compartment_domain.mark(domains_vertex, 2)
+compartment_vertex_index = np.where(domains_vertex.array()==2)[0]
+#c_neg1_vertex_index = pde_nx-c_neg1_vertex_index
 
 # Define new measures
 dx = Measure("dx")[domains_cell]
@@ -73,6 +76,8 @@ u_2 = interpolate(u0, V)
 
 for x in np.arange(interface+h/2,1,h):
     compartments.set_compartment(compartmentsA,[x,0,0],int(u0([x,0,0])*h))
+
+#u_1.vector()[compartment_vertex_index] = 0
 
 # Laplace term
 u = TrialFunction(V)
@@ -139,7 +144,7 @@ while t <= T:
     plot_pde2.set_ydata(u_2.vector().array())
     for rect, height in zip(plot_compart, compartments_array):
         rect.set_height(height/h)
-    plt.pause(1.1)
+    plt.savefig("test_%02.2f.pdf"%t)
 
     
     # f.t = t
