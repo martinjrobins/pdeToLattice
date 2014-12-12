@@ -32,7 +32,7 @@ mesh = UnitIntervalMesh(pde_nx)
 V = FunctionSpace(mesh, 'Lagrange', 1)
 
 # Define boundary and initial conditions
-mu = 0.5; sigma = 0.1
+mu = 0.5; sigma = 0.2
 u0 = Expression('N/(sigma*sqrt(2*3.14))*exp(-pow(x[0]-mu,2)/(2*pow(sigma,2)))',
                 mu=mu, sigma=sigma,N=N)
                 
@@ -51,14 +51,14 @@ domains_cell = CellFunction("size_t", mesh)
 domains_vertex = VertexFunction("size_t", mesh)
 domains_cell.set_all(0)
 domains_vertex.set_all(0)
+compartment_domain = Compartment_domain()
+compartment_domain.mark(domains_cell, 2)
+compartment_domain.mark(domains_vertex, 2)
 c_neg1 = C_neg1()
 c_neg1.mark(domains_cell, 1)
 c_neg1.mark(domains_vertex, 1)
 c_neg1_vertex_index = np.where(domains_vertex.array()==1)[0]
 #c_neg1_vertex_index = pde_nx-c_neg1_vertex_index
-compartment_domain = Compartment_domain()
-compartment_domain.mark(domains_cell, 2)
-compartment_domain.mark(domains_vertex, 2)
 compartment_vertex_index = np.where(domains_vertex.array()==2)[0]
 #c_neg1_vertex_index = pde_nx-c_neg1_vertex_index
 
@@ -77,7 +77,7 @@ u_2 = interpolate(u0, V)
 for x in np.arange(interface+h/2,1,h):
     compartments.set_compartment(compartmentsA,[x,0,0],int(u0([x,0,0])*h))
 
-#u_1.vector()[compartment_vertex_index] = 0
+u_1.vector()[compartment_vertex_index] = 0
 
 # Laplace term
 u = TrialFunction(V)
@@ -104,7 +104,7 @@ A2 = M2 + pde_dt*K2
 # Compute solution
 u = Function(V)
 u2 = Function(V)
-t = pde_dt
+t = 0
 
 # integral over C_-1 pseudocompartment
 c_neg1_integral = u_1*dx(1)
@@ -130,8 +130,15 @@ while t <= T:
     # Update C_-1 compartment
     c_neg1_val = assemble(c_neg1_integral)
     compartments.set_compartment(compartmentsA,[interface-h/2,0,0],int(c_neg1_val))
-
     
+    compartments_array[c_neg1_compartment_index,0,0] = int(c_neg1_val)
+    plot_pde.set_ydata(u_1.vector().array())
+    plot_pde2.set_ydata(u_2.vector().array())
+    for rect, height in zip(plot_compart, compartments_array):
+        rect.set_height(height/h)
+    plt.savefig("test_%02.2f.pdf"%t)
+
+
     # Integrate lattice to t+pde_dt
     compartments.integrate_for_time(pde_dt,pde_dt)
     
@@ -139,13 +146,6 @@ while t <= T:
     compartments_array = compartmentsA.get_compartments()
     dC_neg1 = compartments_array[c_neg1_compartment_index,0,0]-int(c_neg1_val)
     u_1.vector()[c_neg1_vertex_index] += dC_neg1/h
-    
-    plot_pde.set_ydata(u_1.vector().array())
-    plot_pde2.set_ydata(u_2.vector().array())
-    for rect, height in zip(plot_compart, compartments_array):
-        rect.set_height(height/h)
-    plt.savefig("test_%02.2f.pdf"%t)
-
     
     # f.t = t
     #f_k = interpolate(f, V)
@@ -161,4 +161,6 @@ while t <= T:
     t += pde_dt
     u_1.assign(u)
     u_2.assign(u2)
+
+    
  
