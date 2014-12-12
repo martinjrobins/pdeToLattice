@@ -71,6 +71,9 @@ dx = Measure("dx")[domains_cell]
 u_1 = interpolate(u0, V)
 u_2 = interpolate(u0, V)
 
+for x in np.arange(interface+h/2,1,h):
+    compartments.set_compartment(compartmentsA,[x,0,0],int(u0([x,0,0])*h))
+
 # Laplace term
 u = TrialFunction(V)
 u2 = TrialFunction(V)
