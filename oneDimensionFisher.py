@@ -21,6 +21,8 @@ pde_nx = 60
 compart_nx = 20
 h = 1.0/compart_nx
 D = 1.0
+k_1 = 1.0
+k_2 = 1.0
 N = 1000
 interface = 0.5
 c_neg1_compartment_index = int(compart_nx/2)-1
@@ -82,6 +84,7 @@ u_2 = interpolate(u0, V)
 u_1.vector()[compartment_vertex_index] = 0
 
 
+
 # Laplace term
 u = TrialFunction(V)
 u2 = TrialFunction(V)
@@ -103,6 +106,10 @@ A2 = M2 + pde_dt*K2
 
 # source term
 #f = Expression('beta - 2 - 2*alpha', beta=beta, alpha=alpha)
+
+# reaction term
+r = Vector(pde_nx)
+r2 = Vector(pde_nx)
 
 # Compute solution
 u = Function(V)
@@ -175,9 +182,15 @@ while t <= T:
     # f.t = t
     #f_k = interpolate(f, V)
     #F_k = f_k.vector()
-    #b = M*u_1.vector() + pde_dt*M*F_k
-    b = M*u_1.vector()
-    b2 = M2*u_2.vector()
+    
+    # Reaction Term u(u-1)
+    r = (k_1*u_1 - k_2*u_1**2)
+    r2 = (k_1*u_2 - k_2*u_2**2)
+    print r
+    
+    b = M*u_1.vector() + pde_dt*r
+    b2 = M2*u_2.vector()  + pde_dt*r2
+    
     u0.t = t
     #bc.apply(A, b)
     solve(A, u.vector(), b)
